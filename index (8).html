@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sword Clash — Team Battle</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Noto+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#0a0a0f;color:#e0dcd0;font-family:'Noto Sans',sans-serif}
+canvas{display:block;cursor:crosshair}
+
+/* ═══ MENU ═══ */
+.screen{display:none;position:fixed;inset:0;z-index:100;flex-direction:column;align-items:center;justify-content:center;padding:20px;background:radial-gradient(ellipse at 50% 40%,#1a1520,#0a0a0f 70%)}.screen.active{display:flex}
+.title{font-family:'Cinzel',serif;font-size:3rem;font-weight:900;letter-spacing:6px;margin-bottom:4px}
+.title .s1{color:#d4af37}.title .s2{color:#e0dcd0}
+.subtitle{color:#666;font-size:.7rem;letter-spacing:5px;margin-bottom:30px;font-family:'Cinzel',serif}
+.card{background:rgba(15,12,20,.95);border:1px solid rgba(212,175,55,.15);padding:24px;max-width:420px;width:100%;position:relative}
+.card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#d4af37,transparent)}
+.card h2{font-family:'Cinzel',serif;font-size:1rem;color:#d4af37;margin-bottom:14px;letter-spacing:2px}
+.field{margin-bottom:12px}
+.field label{display:block;font-size:.6rem;color:#666;letter-spacing:2px;text-transform:uppercase;margin-bottom:3px}
+.field input{width:100%;padding:9px 12px;background:#0a0a0f;border:1px solid #2a2030;color:#e0dcd0;font-family:inherit;font-size:.85rem;outline:none}
+.field input:focus{border-color:#d4af37}
+.team-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+.team-btn{padding:14px 8px;text-align:center;border:2px solid #2a2030;background:#0a0a0f;cursor:pointer;transition:all .15s}
+.team-btn:hover{border-color:#555}
+.team-btn.sel{box-shadow:0 0 20px rgba(212,175,55,.15)}
+.team-btn.sel[data-team="arab"]{border-color:#2ecc71;background:rgba(46,204,113,.08)}
+.team-btn.sel[data-team="persian"]{border-color:#9b59b6;background:rgba(155,89,182,.08)}
+.team-btn.sel[data-team="rome"]{border-color:#e74c3c;background:rgba(231,76,60,.08)}
+.team-name{font-family:'Cinzel',serif;font-size:.75rem;font-weight:700;letter-spacing:2px;margin-top:4px}
+.team-icon{font-size:1.8rem}
+.btn{display:block;width:100%;padding:12px;font-family:'Cinzel',serif;font-size:.85rem;font-weight:700;letter-spacing:3px;border:none;cursor:pointer;text-transform:uppercase;transition:all .15s}
+.btn-gold{background:#d4af37;color:#0a0a0f}.btn-gold:hover{filter:brightness(1.15)}
+.btn-dark{background:#2a2030;color:#e0dcd0;margin-top:6px}.btn-dark:hover{background:#3a3040}
+.divider{text-align:center;color:#555;margin:14px 0;font-size:.65rem;letter-spacing:4px;font-family:'Cinzel',serif}
+.room-code-display{font-family:'Cinzel',serif;font-size:2rem;font-weight:900;color:#d4af37;letter-spacing:8px;text-align:center;margin:8px 0;padding:8px;background:#0a0a0f;border:2px dashed #d4af37}
+.plist{list-style:none;margin:8px 0}.plist li{padding:6px 8px;background:#0a0a0f;border:1px solid #2a2030;margin-bottom:3px;font-size:.75rem;display:flex;align-items:center;gap:6px}
+.pdot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.info{text-align:center;color:#555;font-size:.6rem;margin-top:8px;letter-spacing:2px}
+
+/* ═══ HUD ═══ */
+#hud{position:fixed;top:0;left:0;right:0;z-index:50;display:none;padding:8px 14px;pointer-events:none}
+.hud-row{display:flex;justify-content:space-between;align-items:center;pointer-events:auto}
+.hud-box{background:rgba(0,0,0,.75);border:1px solid #2a2030;padding:5px 10px;font-size:.7rem;backdrop-filter:blur(4px)}
+.hud-val{font-family:'Cinzel',serif;font-weight:700;color:#d4af37}
+.hud-dim{color:#666;font-size:.55rem;letter-spacing:1px}
+.hp-bar{width:140px;height:8px;background:#1a1a1a;border:1px solid #333;margin-top:3px}
+.hp-fill{height:100%;transition:width .2s}
+.kill-feed{position:fixed;top:50px;right:10px;z-index:50;display:none;flex-direction:column;gap:3px;pointer-events:none}
+.kill-msg{background:rgba(0,0,0,.7);padding:4px 10px;font-size:.65rem;border-left:3px solid #d4af37;animation:fadeKill 3s forwards}
+@keyframes fadeKill{0%{opacity:1}70%{opacity:1}100%{opacity:0}}
+
+/* ═══ DEATH SCREEN ═══ */
+#death-overlay{position:fixed;inset:0;z-index:150;display:none;align-items:center;justify-content:center;background:rgba(100,0,0,.3);pointer-events:none}
+#death-overlay .death-text{font-family:'Cinzel',serif;font-size:2.5rem;color:#e74c3c;letter-spacing:6px;text-shadow:0 0 30px rgba(231,76,60,.4)}
+#death-overlay .respawn-text{color:#aaa;font-size:.8rem;margin-top:8px}
+
+/* ═══ SCOREBOARD ═══ */
+#scoreboard{position:fixed;left:10px;top:50%;transform:translateY(-50%);z-index:50;display:none;background:rgba(0,0,0,.8);border:1px solid #2a2030;padding:10px;min-width:130px;font-size:.65rem;backdrop-filter:blur(4px)}
+#scoreboard h4{font-family:'Cinzel',serif;font-size:.7rem;color:#d4af37;letter-spacing:2px;margin-bottom:6px;text-align:center}
+.sb-team{margin-bottom:6px}
+.sb-team-name{font-weight:700;font-size:.6rem;letter-spacing:1px;margin-bottom:2px}
+.sb-player{padding:1px 4px;font-size:.6rem;color:#aaa}
+</style>
+</head>
+<body>
+
+<!-- ═══ MAIN MENU ═══ -->
+<div id="menu" class="screen active">
+  <div class="title"><span class="s1">SWORD</span> <span class="s2">CLASH</span></div>
+  <div class="subtitle">Team Battle</div>
+  <div class="card">
+    <h2>Join The Battle</h2>
+    <div class="field"><label>Your Name</label><input id="p-name" maxlength="12" placeholder="Warrior name..."></div>
+    <div class="field"><label>Choose Your Team</label></div>
+    <div class="team-grid">
+      <div class="team-btn sel" data-team="arab" onclick="selectTeam(this)"><div class="team-icon">⚔️</div><div class="team-name" style="color:#2ecc71">ARAB</div></div>
+      <div class="team-btn" data-team="persian" onclick="selectTeam(this)"><div class="team-icon">🛡️</div><div class="team-name" style="color:#9b59b6">PERSIAN</div></div>
+      <div class="team-btn" data-team="rome" onclick="selectTeam(this)"><div class="team-icon">🗡️</div><div class="team-name" style="color:#e74c3c">ROME</div></div>
+    </div>
+    <button class="btn btn-gold" onclick="createRoom()">Create Room</button>
+    <div class="divider">— or join —</div>
+    <div class="field"><label>Room Code</label><input id="p-code" maxlength="6" placeholder="ABC123" style="text-transform:uppercase;text-align:center;font-size:1rem;letter-spacing:4px"></div>
+    <button class="btn btn-dark" onclick="joinRoom()">Join Room</button>
+  </div>
+</div>
+
+<!-- ═══ LOBBY ═══ -->
+<div id="lobby" class="screen">
+  <div class="card" style="text-align:center">
+    <h2>War Room</h2>
+    <div style="color:#555;font-size:.55rem;letter-spacing:2px">ROOM CODE</div>
+    <div class="room-code-display" id="lb-code">------</div>
+    <ul class="plist" id="lb-pl"></ul>
+    <button class="btn btn-gold" id="lb-go" onclick="hostStartGame()" style="display:none">Start Battle</button>
+    <div class="info" id="lb-st">Waiting for warriors...</div>
+  </div>
+</div>
+
+<!-- ═══ GAME CANVAS ═══ -->
+<canvas id="gc"></canvas>
+
+<!-- ═══ HUD ═══ -->
+<div id="hud">
+  <div class="hud-row">
+    <div class="hud-box">
+      <span class="hud-dim">ROOM </span><span class="hud-val" id="h-room">---</span>&nbsp;&nbsp;
+      <span class="hud-dim">TEAM </span><span class="hud-val" id="h-team">---</span>
+    </div>
+    <div class="hud-box">
+      <span class="hud-dim">HEALTH</span>
+      <div class="hp-bar"><div class="hp-fill" id="h-hp" style="width:100%;background:#2ecc71"></div></div>
+    </div>
+    <div class="hud-box">
+      <span class="hud-dim">KILLS </span><span class="hud-val" id="h-kills">0</span>&nbsp;&nbsp;
+      <span class="hud-dim">DEATHS </span><span class="hud-val" id="h-deaths">0</span>
+    </div>
+  </div>
+</div>
+
+<div class="kill-feed" id="kill-feed"></div>
+<div id="death-overlay"><div style="text-align:center"><div class="death-text">YOU DIED</div><div class="respawn-text" id="respawn-txt">Respawning in 5...</div></div></div>
+<div id="scoreboard"><h4>WARRIORS</h4><div id="sb-content"></div></div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script>
+// ═══════════════════════════════════════════════
+//  SWORD CLASH — Multiplayer Team Battle
+// ═══════════════════════════════════════════════
+
+// Firebase — hardcoded Fortuna project
+firebase.initializeApp({
+  apiKey:"AIzaSyASPNSXdFs2B3X8mbUq-nBYlgAIR7BSx6E",
+  authDomain:"fortuna-64c00.firebaseapp.com",
+  databaseURL:"https://fortuna-64c00-default-rtdb.firebaseio.com",
+  projectId:"fortuna-64c00",
+  storageBucket:"fortuna-64c00.firebasestorage.app",
+  messagingSenderId:"329218105683",
+  appId:"1:329218105683:web:6b16fd2b1091531e4481a6"
+});
+const db=firebase.database(),RT='sword_clash';
+
+// ═══ CONSTANTS ═══
+const TEAMS={
+  arab:{color:'#2ecc71',dark:'#1a8a4a',spawn:{x:200,y:200},name:'ARAB'},
+  persian:{color:'#9b59b6',dark:'#6a3a8a',spawn:{x:1800,y:200},name:'PERSIAN'},
+  rome:{color:'#e74c3c',dark:'#a02a1a',spawn:{x:1000,y:1800},name:'ROME'}
+};
+const MAP_W=2000,MAP_H=2000;
+const PLAYER_R=16,SPEED=180,SWORD_RANGE=55,SWORD_DMG=25,SWORD_CD=0.5;
+const MAX_HP=100,RESPAWN_TIME=5;
+const BASE_R=180; // team base radius
+
+// ═══ STATE ═══
+let canvas,ctx,W,H;
+let myId=null,myName='',myTeam='arab',roomId=null,roomRef=null,isHost=false;
+let gamePlayers={},localPlayer=null;
+let keys={},mouse={x:0,y:0},mouseDown=false;
+let cam={x:0,y:0};
+let swordAngle=0,swordSwing=0,swordCooldown=0;
+let kills=0,deaths=0;
+let gameOn=false,lastT=0;
+let particles=[];
+
+// ═══ HELPERS ═══
+function genCode(){const c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let r='';for(let i=0;i<6;i++)r+=c[~~(Math.random()*c.length)];return r}
+function genId(){return'w_'+Date.now()+'_'+Math.random().toString(36).substr(2,6)}
+function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active')}
+function dist(a,b){return Math.sqrt((a.x-b.x)**2+(a.y-b.y)**2)}
+
+// ═══ TEAM SELECTION ═══
+function selectTeam(el){
+  document.querySelectorAll('.team-btn').forEach(b=>b.classList.remove('sel'));
+  el.classList.add('sel');
+  myTeam=el.dataset.team;
+}
+
+// ═══ CREATE ROOM ═══
+async function createRoom(){
+  myName=document.getElementById('p-name').value.trim()||'Warrior';
+  myId=genId();roomId=genCode();
+  roomRef=db.ref(RT+'/'+roomId);isHost=true;
+  await roomRef.set({code:roomId,host:myId,status:'lobby',players:{[myId]:{name:myName,team:myTeam,x:0,y:0,hp:MAX_HP,alive:true,kills:0,deaths:0,atk:0}}});
+  roomRef.child('players/'+myId).onDisconnect().remove();
+  document.getElementById('lb-code').textContent=roomId;
+  setupLobby();showScreen('lobby');
+}
+
+// ═══ JOIN ROOM ═══
+async function joinRoom(){
+  myName=document.getElementById('p-name').value.trim()||'Warrior';
+  const code=document.getElementById('p-code').value.trim().toUpperCase();
+  if(!code){alert('Enter a room code');return;}
+  roomRef=db.ref(RT+'/'+code);
+  const snap=await roomRef.once('value');
+  if(!snap.exists()){alert('Room not found');return;}
+  myId=genId();roomId=code;isHost=false;
+  await roomRef.child('players/'+myId).set({name:myName,team:myTeam,x:0,y:0,hp:MAX_HP,alive:true,kills:0,deaths:0,atk:0});
+  roomRef.child('players/'+myId).onDisconnect().remove();
+  document.getElementById('lb-code').textContent=roomId;
+  setupLobby();showScreen('lobby');
+}
+
+// ═══ LOBBY ═══
+function setupLobby(){
+  const teamColors={arab:'#2ecc71',persian:'#9b59b6',rome:'#e74c3c'};
+  roomRef.child('players').on('value',snap=>{
+    const pl=snap.val()||{},list=document.getElementById('lb-pl');list.innerHTML='';
+    Object.entries(pl).forEach(([id,p])=>{
+      const li=document.createElement('li');
+      li.innerHTML=`<span class="pdot" style="background:${teamColors[p.team]||'#888'}"></span>${p.name} <span style="color:${teamColors[p.team]};font-size:.6rem">[${(p.team||'?').toUpperCase()}]</span>${id===myId?' (You)':''}`;
+      list.appendChild(li);
+    });
+    const n=Object.keys(pl).length;
+    document.getElementById('lb-go').style.display=(isHost&&n>=1)?'block':'none';
+    document.getElementById('lb-st').textContent=n+' warrior'+(n>1?'s':'')+' ready';
+  });
+  roomRef.child('status').on('value',snap=>{
+    if(snap.val()==='playing')initGame();
+  });
+}
+
+function hostStartGame(){
+  roomRef.child('status').set('playing');
+}
+
+// ═══ INIT GAME ═══
+function initGame(){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('hud').style.display='block';
+  document.getElementById('kill-feed').style.display='flex';
+  document.getElementById('scoreboard').style.display='block';
+  
+  canvas=document.getElementById('gc');ctx=canvas.getContext('2d');
+  W=innerWidth;H=innerHeight;canvas.width=W;canvas.height=H;
+  window.addEventListener('resize',()=>{W=innerWidth;H=innerHeight;canvas.width=W;canvas.height=H;});
+  
+  // Spawn at team base
+  const spawn=TEAMS[myTeam].spawn;
+  localPlayer={
+    x:spawn.x+(Math.random()-.5)*60,
+    y:spawn.y+(Math.random()-.5)*60,
+    hp:MAX_HP,alive:true,team:myTeam
+  };
+  kills=0;deaths=0;swordCooldown=0;swordSwing=0;
+  particles=[];gameOn=true;
+  
+  // Update HUD
+  document.getElementById('h-room').textContent=roomId;
+  document.getElementById('h-team').textContent=myTeam.toUpperCase();
+  document.getElementById('h-team').style.color=TEAMS[myTeam].color;
+  
+  // Firebase listeners
+  roomRef.child('players').on('value',snap=>{gamePlayers=snap.val()||{};updateScoreboard();});
+  
+  // Sync position
+  setInterval(syncPlayer,60);
+  
+  // Attack listener from other players
+  roomRef.child('attacks').on('child_added',snap=>{
+    const atk=snap.val();
+    if(!atk||atk.by===myId)return;
+    if(!localPlayer.alive)return;
+    // Check if we got hit
+    const attacker=gamePlayers[atk.by];
+    if(!attacker)return;
+    if(attacker.team===myTeam)return; // no friendly fire
+    const d=dist({x:atk.x,y:atk.y},localPlayer);
+    if(d<SWORD_RANGE){
+      localPlayer.hp-=SWORD_DMG;
+      spawnParticles(localPlayer.x,localPlayer.y,TEAMS[myTeam].color,8);
+      if(localPlayer.hp<=0){
+        localPlayer.hp=0;localPlayer.alive=false;
+        deaths++;
+        // Credit kill to attacker
+        roomRef.child('players/'+atk.by+'/kills').transaction(k=>(k||0)+1);
+        addKillMsg(attacker.name,attacker.team,myName,myTeam);
+        roomRef.child('kills').push({killer:atk.by,killerName:attacker.name,killerTeam:attacker.team,victim:myId,victimName:myName,victimTeam:myTeam,t:Date.now()});
+        die();
+      }
+      syncPlayer();
+    }
+    // Clean up attack
+    snap.ref.remove();
+  });
+  
+  // Kill feed from Firebase
+  roomRef.child('kills').orderByChild('t').limitToLast(1).on('child_added',snap=>{
+    const k=snap.val();if(!k)return;
+    addKillMsg(k.killerName,k.killerTeam,k.victimName,k.victimTeam);
+  });
+  
+  lastT=performance.now();
+  requestAnimationFrame(loop);
+}
+
+// ═══ SYNC ═══
+function syncPlayer(){
+  if(!roomRef||!myId||!localPlayer)return;
+  roomRef.child('players/'+myId).update({
+    x:Math.round(localPlayer.x),y:Math.round(localPlayer.y),
+    hp:localPlayer.hp,alive:localPlayer.alive,
+    kills,deaths,team:myTeam,name:myName,t:Date.now()
+  });
+}
+
+// ═══ DEATH & RESPAWN ═══
+function die(){
+  document.getElementById('death-overlay').style.display='flex';
+  let countdown=RESPAWN_TIME;
+  document.getElementById('respawn-txt').textContent='Respawning in '+countdown+'...';
+  const iv=setInterval(()=>{
+    countdown--;
+    document.getElementById('respawn-txt').textContent=countdown>0?'Respawning in '+countdown+'...':'';
+    if(countdown<=0){
+      clearInterval(iv);
+      respawn();
+    }
+  },1000);
+}
+
+function respawn(){
+  document.getElementById('death-overlay').style.display='none';
+  const spawn=TEAMS[myTeam].spawn;
+  localPlayer.x=spawn.x+(Math.random()-.5)*60;
+  localPlayer.y=spawn.y+(Math.random()-.5)*60;
+  localPlayer.hp=MAX_HP;localPlayer.alive=true;
+  syncPlayer();
+}
+
+// ═══ ATTACK ═══
+function doAttack(){
+  if(swordCooldown>0||!localPlayer.alive)return;
+  swordSwing=1;swordCooldown=SWORD_CD;
+  
+  // Calculate sword tip position
+  const tipX=localPlayer.x+Math.cos(swordAngle)*SWORD_RANGE;
+  const tipY=localPlayer.y+Math.sin(swordAngle)*SWORD_RANGE;
+  
+  // Push attack to Firebase for other players to check
+  roomRef.child('attacks').push({
+    by:myId,x:tipX,y:tipY,angle:swordAngle,t:Date.now()
+  });
+  
+  spawnParticles(tipX,tipY,'#fff',5);
+}
+
+// ═══ PARTICLES ═══
+function spawnParticles(x,y,color,n){
+  for(let i=0;i<n;i++){
+    particles.push({x,y,vx:(Math.random()-.5)*150,vy:(Math.random()-.5)*150,life:0.6+Math.random()*0.4,color,size:2+Math.random()*3});
+  }
+}
+
+// ═══ KILL FEED ═══
+function addKillMsg(killerName,killerTeam,victimName,victimTeam){
+  const feed=document.getElementById('kill-feed');
+  const div=document.createElement('div');
+  div.className='kill-msg';
+  div.innerHTML=`<span style="color:${TEAMS[killerTeam]?.color||'#fff'}">${killerName}</span> ⚔ <span style="color:${TEAMS[victimTeam]?.color||'#fff'}">${victimName}</span>`;
+  feed.appendChild(div);
+  setTimeout(()=>div.remove(),3500);
+  // Keep max 5
+  while(feed.children.length>5)feed.firstChild.remove();
+}
+
+// ═══ SCOREBOARD ═══
+function updateScoreboard(){
+  const content=document.getElementById('sb-content');
+  content.innerHTML='';
+  ['arab','persian','rome'].forEach(team=>{
+    const t=TEAMS[team];
+    const teamPlayers=Object.entries(gamePlayers).filter(([,p])=>p.team===team);
+    if(!teamPlayers.length)return;
+    const div=document.createElement('div');div.className='sb-team';
+    div.innerHTML=`<div class="sb-team-name" style="color:${t.color}">${t.name} (${teamPlayers.length})</div>`;
+    teamPlayers.sort((a,b)=>(b[1].kills||0)-(a[1].kills||0)).forEach(([id,p])=>{
+      const pd=document.createElement('div');pd.className='sb-player';
+      pd.textContent=`${p.name}: ${p.kills||0}K / ${p.deaths||0}D`;
+      if(id===myId)pd.style.color='#d4af37';
+      div.appendChild(pd);
+    });
+    content.appendChild(div);
+  });
+}
+
+// ═══ GAME LOOP ═══
+function loop(ts){
+  const dt=Math.min((ts-lastT)/1000,.05);lastT=ts;
+  if(gameOn){update(dt);draw();}
+  requestAnimationFrame(loop);
+}
+
+function update(dt){
+  if(!localPlayer||!localPlayer.alive)return;
+  
+  // Movement
+  let dx=0,dy=0;
+  if(keys['w']||keys['arrowup'])dy-=1;
+  if(keys['s']||keys['arrowdown'])dy+=1;
+  if(keys['a']||keys['arrowleft'])dx-=1;
+  if(keys['d']||keys['arrowright'])dx+=1;
+  if(dx||dy){
+    const len=Math.sqrt(dx*dx+dy*dy);dx/=len;dy/=len;
+    localPlayer.x+=dx*SPEED*dt;
+    localPlayer.y+=dy*SPEED*dt;
+  }
+  // Clamp to map
+  localPlayer.x=Math.max(PLAYER_R,Math.min(MAP_W-PLAYER_R,localPlayer.x));
+  localPlayer.y=Math.max(PLAYER_R,Math.min(MAP_H-PLAYER_R,localPlayer.y));
+  
+  // Sword angle toward mouse
+  const worldMouseX=mouse.x+cam.x;
+  const worldMouseY=mouse.y+cam.y;
+  swordAngle=Math.atan2(worldMouseY-localPlayer.y,worldMouseX-localPlayer.x);
+  
+  // Sword swing animation
+  if(swordSwing>0)swordSwing=Math.max(0,swordSwing-dt*4);
+  if(swordCooldown>0)swordCooldown=Math.max(0,swordCooldown-dt);
+  
+  // Auto attack on click hold
+  if(mouseDown)doAttack();
+  
+  // Camera
+  cam.x=localPlayer.x-W/2;
+  cam.y=localPlayer.y-H/2;
+  
+  // Particles
+  for(let i=particles.length-1;i>=0;i--){
+    const p=particles[i];
+    p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt;
+    if(p.life<=0)particles.splice(i,1);
+  }
+  
+  // HUD
+  document.getElementById('h-hp').style.width=(localPlayer.hp/MAX_HP*100)+'%';
+  const hpColor=localPlayer.hp>60?'#2ecc71':localPlayer.hp>30?'#f0c020':'#e74c3c';
+  document.getElementById('h-hp').style.background=hpColor;
+  document.getElementById('h-kills').textContent=kills;
+  document.getElementById('h-deaths').textContent=deaths;
+}
+
+// ═══ DRAW ═══
+function draw(){
+  ctx.fillStyle='#0d1a0d';ctx.fillRect(0,0,W,H);
+  ctx.save();
+  ctx.translate(-cam.x,-cam.y);
+  
+  // ── Ground grid ──
+  ctx.strokeStyle='#162016';ctx.lineWidth=1;
+  const gs=80;
+  const sx=Math.floor(cam.x/gs)*gs;
+  const sy=Math.floor(cam.y/gs)*gs;
+  for(let gx=sx;gx<cam.x+W+gs;gx+=gs){ctx.beginPath();ctx.moveTo(gx,cam.y);ctx.lineTo(gx,cam.y+H);ctx.stroke();}
+  for(let gy=sy;gy<cam.y+H+gs;gy+=gs){ctx.beginPath();ctx.moveTo(cam.x,gy);ctx.lineTo(cam.x+W,gy);ctx.stroke();}
+  
+  // ── Map border ──
+  ctx.strokeStyle='#333';ctx.lineWidth=3;
+  ctx.strokeRect(0,0,MAP_W,MAP_H);
+  
+  // ── Team bases ──
+  Object.entries(TEAMS).forEach(([team,t])=>{
+    // Base circle
+    ctx.beginPath();ctx.arc(t.spawn.x,t.spawn.y,BASE_R,0,Math.PI*2);
+    ctx.fillStyle=t.color+'15';ctx.fill();
+    ctx.strokeStyle=t.color+'40';ctx.lineWidth=2;ctx.stroke();
+    // Base inner
+    ctx.beginPath();ctx.arc(t.spawn.x,t.spawn.y,40,0,Math.PI*2);
+    ctx.fillStyle=t.color+'30';ctx.fill();
+    // Flag
+    ctx.fillStyle=t.color;
+    ctx.fillRect(t.spawn.x-2,t.spawn.y-35,4,40);
+    ctx.beginPath();ctx.moveTo(t.spawn.x+2,t.spawn.y-35);
+    ctx.lineTo(t.spawn.x+22,t.spawn.y-25);
+    ctx.lineTo(t.spawn.x+2,t.spawn.y-15);ctx.fill();
+    // Label
+    ctx.font='bold 11px Cinzel';ctx.textAlign='center';
+    ctx.fillStyle=t.color;ctx.fillText(t.name,t.spawn.x,t.spawn.y+55);
+  });
+  
+  // ── Center arena ──
+  const cx=MAP_W/2,cy=MAP_H/2;
+  ctx.beginPath();ctx.arc(cx,cy,250,0,Math.PI*2);
+  ctx.fillStyle='rgba(212,175,55,0.03)';ctx.fill();
+  ctx.strokeStyle='rgba(212,175,55,0.1)';ctx.lineWidth=2;ctx.setLineDash([10,10]);ctx.stroke();ctx.setLineDash([]);
+  ctx.font='bold 14px Cinzel';ctx.textAlign='center';
+  ctx.fillStyle='rgba(212,175,55,0.15)';ctx.fillText('BATTLE ARENA',cx,cy);
+  
+  // ── Arena decorations ──
+  // Stone pillars at center
+  for(let angle=0;angle<Math.PI*2;angle+=Math.PI/3){
+    const px=cx+Math.cos(angle)*200;
+    const py=cy+Math.sin(angle)*200;
+    ctx.fillStyle='#2a2a2a';
+    ctx.fillRect(px-8,py-8,16,16);
+    ctx.fillStyle='#3a3a3a';
+    ctx.fillRect(px-6,py-6,12,12);
+  }
+  
+  // Walls/obstacles scattered around
+  const walls=[
+    {x:600,y:600,w:80,h:20},{x:1400,y:600,w:80,h:20},
+    {x:600,y:1400,w:80,h:20},{x:1400,y:1400,w:80,h:20},
+    {x:1000,y:700,w:20,h:80},{x:1000,y:1300,w:20,h:80},
+    {x:700,y:1000,w:20,h:80},{x:1300,y:1000,w:20,h:80},
+  ];
+  walls.forEach(w=>{
+    ctx.fillStyle='#1a1a2a';ctx.fillRect(w.x-w.w/2,w.y-w.h/2,w.w,w.h);
+    ctx.strokeStyle='#2a2a3a';ctx.lineWidth=1;ctx.strokeRect(w.x-w.w/2,w.y-w.h/2,w.w,w.h);
+  });
+  
+  // ── All players ──
+  const now=Date.now();
+  Object.entries(gamePlayers).forEach(([id,p])=>{
+    if(!p||now-p.t>8000)return;
+    const isMe=id===myId;
+    if(isMe)return; // draw local player separately
+    if(!p.alive){
+      // Dead player X
+      ctx.globalAlpha=0.3;
+      ctx.fillStyle='#666';ctx.font='bold 16px sans-serif';ctx.textAlign='center';
+      ctx.fillText('☠',p.x,p.y+5);
+      ctx.globalAlpha=1;
+      return;
+    }
+    const t=TEAMS[p.team]||TEAMS.arab;
+    drawPlayer(p.x,p.y,t.color,t.dark,p.name,p.hp,false,0,0);
+  });
+  
+  // ── Local player ──
+  if(localPlayer&&localPlayer.alive){
+    const t=TEAMS[myTeam];
+    drawPlayer(localPlayer.x,localPlayer.y,t.color,t.dark,myName,localPlayer.hp,true,swordAngle,swordSwing);
+  }
+  
+  // ── Particles ──
+  for(const p of particles){
+    ctx.globalAlpha=p.life;
+    ctx.fillStyle=p.color;
+    ctx.fillRect(p.x-p.size/2,p.y-p.size/2,p.size,p.size);
+  }
+  ctx.globalAlpha=1;
+  
+  ctx.restore();
+  
+  // ── Minimap ──
+  drawMinimap();
+}
+
+function drawPlayer(x,y,color,darkColor,name,hp,isLocal,sAngle,swing){
+  // Shadow
+  ctx.fillStyle='rgba(0,0,0,0.3)';
+  ctx.beginPath();ctx.ellipse(x,y+PLAYER_R+2,PLAYER_R*0.8,4,0,0,Math.PI*2);ctx.fill();
+  
+  // Body
+  ctx.fillStyle=darkColor;
+  ctx.beginPath();ctx.arc(x,y,PLAYER_R,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle=color;
+  ctx.beginPath();ctx.arc(x,y,PLAYER_R-2,0,Math.PI*2);ctx.fill();
+  
+  // Inner highlight
+  ctx.fillStyle='rgba(255,255,255,0.1)';
+  ctx.beginPath();ctx.arc(x-3,y-3,PLAYER_R*0.5,0,Math.PI*2);ctx.fill();
+  
+  // Eyes
+  if(isLocal){
+    const ex=Math.cos(sAngle)*4,ey=Math.sin(sAngle)*4;
+    ctx.fillStyle='#fff';
+    ctx.beginPath();ctx.arc(x-4+ex*0.3,y-3+ey*0.3,3,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(x+4+ex*0.3,y-3+ey*0.3,3,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#111';
+    ctx.beginPath();ctx.arc(x-4+ex*0.5,y-3+ey*0.5,1.5,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(x+4+ex*0.5,y-3+ey*0.5,1.5,0,Math.PI*2);ctx.fill();
+  } else {
+    ctx.fillStyle='#fff';
+    ctx.beginPath();ctx.arc(x-4,y-3,3,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(x+4,y-3,3,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#111';
+    ctx.beginPath();ctx.arc(x-4,y-3,1.5,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(x+4,y-3,1.5,0,Math.PI*2);ctx.fill();
+  }
+  
+  // Sword
+  if(isLocal){
+    const swingOff=swing*1.2;
+    const sa=sAngle-0.3+swingOff;
+    const sLen=35;
+    const sx=x+Math.cos(sa)*PLAYER_R;
+    const sy=y+Math.sin(sa)*PLAYER_R;
+    const stx=sx+Math.cos(sa)*sLen;
+    const sty=sy+Math.sin(sa)*sLen;
+    // Blade
+    ctx.strokeStyle='#ccc';ctx.lineWidth=3;ctx.lineCap='round';
+    ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(stx,sty);ctx.stroke();
+    // Blade shine
+    ctx.strokeStyle='rgba(255,255,255,0.4)';ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(stx,sty);ctx.stroke();
+    // Hilt
+    ctx.fillStyle='#8B4513';
+    ctx.beginPath();ctx.arc(sx,sy,4,0,Math.PI*2);ctx.fill();
+    // Swing arc
+    if(swing>0.3){
+      ctx.strokeStyle=color+'60';ctx.lineWidth=2;
+      ctx.beginPath();ctx.arc(x,y,SWORD_RANGE,sa-0.5,sa+0.5);ctx.stroke();
+    }
+  }
+  
+  // Name tag
+  ctx.font='bold 10px "Noto Sans"';ctx.textAlign='center';
+  ctx.fillStyle='rgba(0,0,0,0.6)';
+  const tw=ctx.measureText(name).width;
+  ctx.fillRect(x-tw/2-4,y-PLAYER_R-18,tw+8,14);
+  ctx.fillStyle=isLocal?'#d4af37':color;
+  ctx.fillText(name,x,y-PLAYER_R-8);
+  
+  // HP bar (above name for others)
+  if(!isLocal&&hp<MAX_HP){
+    const barW=30,barH=3;
+    ctx.fillStyle='#1a1a1a';ctx.fillRect(x-barW/2,y-PLAYER_R-24,barW,barH);
+    const hpPct=Math.max(0,hp/MAX_HP);
+    ctx.fillStyle=hpPct>.6?'#2ecc71':hpPct>.3?'#f0c020':'#e74c3c';
+    ctx.fillRect(x-barW/2,y-PLAYER_R-24,barW*hpPct,barH);
+  }
+}
+
+function drawMinimap(){
+  const mmW=140,mmH=140;
+  const mmX=W-mmW-10,mmY=H-mmH-10;
+  const scale=mmW/MAP_W;
+  
+  ctx.fillStyle='rgba(0,0,0,0.6)';ctx.fillRect(mmX,mmY,mmW,mmH);
+  ctx.strokeStyle='#333';ctx.lineWidth=1;ctx.strokeRect(mmX,mmY,mmW,mmH);
+  
+  // Team bases on minimap
+  Object.entries(TEAMS).forEach(([,t])=>{
+    ctx.fillStyle=t.color+'30';
+    ctx.beginPath();ctx.arc(mmX+t.spawn.x*scale,mmY+t.spawn.y*scale,BASE_R*scale,0,Math.PI*2);ctx.fill();
+  });
+  
+  // Players on minimap
+  const now=Date.now();
+  Object.entries(gamePlayers).forEach(([id,p])=>{
+    if(!p||now-p.t>8000||!p.alive)return;
+    const t=TEAMS[p.team]||TEAMS.arab;
+    ctx.fillStyle=id===myId?'#fff':t.color;
+    ctx.fillRect(mmX+p.x*scale-2,mmY+p.y*scale-2,4,4);
+  });
+  
+  // Camera viewport
+  ctx.strokeStyle='#d4af3755';ctx.lineWidth=1;
+  ctx.strokeRect(mmX+cam.x*scale,mmY+cam.y*scale,W*scale,H*scale);
+}
+
+// ═══ INPUT ═══
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT')return;
+  keys[e.key.toLowerCase()]=true;
+  if(['arrowup','arrowdown','arrowleft','arrowright'].includes(e.key.toLowerCase()))e.preventDefault();
+  if(e.key===' ')doAttack(); // spacebar attack
+});
+document.addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=false;});
+window.addEventListener('blur',()=>{for(const k in keys)keys[k]=false;mouseDown=false;});
+
+canvas=document.getElementById('gc');
+canvas.addEventListener('mousemove',e=>{mouse.x=e.clientX;mouse.y=e.clientY;});
+canvas.addEventListener('mousedown',e=>{mouseDown=true;doAttack();});
+canvas.addEventListener('mouseup',()=>{mouseDown=false;});
+canvas.addEventListener('contextmenu',e=>e.preventDefault());
+
+// Enter key shortcuts
+document.getElementById('p-code').addEventListener('keydown',e=>{if(e.key==='Enter')joinRoom();});
+document.getElementById('p-name').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('p-code').focus();});
+
+function backToMenu(){
+  gameOn=false;
+  document.getElementById('hud').style.display='none';
+  document.getElementById('kill-feed').style.display='none';
+  document.getElementById('scoreboard').style.display='none';
+  showScreen('menu');
+}
+
+// Clean up stale attacks periodically
+setInterval(()=>{
+  if(!roomRef)return;
+  roomRef.child('attacks').once('value',snap=>{
+    const atks=snap.val()||{};
+    const now=Date.now();
+    Object.entries(atks).forEach(([key,a])=>{
+      if(now-a.t>2000)roomRef.child('attacks/'+key).remove();
+    });
+  });
+},3000);
+</script>
+</body>
+</html>
